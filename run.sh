@@ -1,9 +1,6 @@
 #!/bin/bash
 
 installCursor() {
-if ! [ -f /opt/cursor.appimage ]; then
-echo "Installing Cursor AI IDE..."
-
     # URLs for Cursor AppImage and Icon
     CURSOR_URL="https://downloads.cursor.com/production/faa03b17cce93e8a80b7d62d57f5eda6bb6ab9fa/linux/x64/Cursor-1.2.2-x86_64.AppImage"
     ICON_URL="https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/cursor.png"
@@ -20,6 +17,38 @@ echo "Installing Cursor AI IDE..."
         sudo apt-get install -y curl
     fi
 
+    if [ -f "$APPIMAGE_PATH" ]; then
+        echo "Cursor AI IDE is already installed. Do you want to update? (y/n)"
+        read -r resposta
+        if [[ ! "$resposta" =~ ^[yY]$ ]]; then
+            echo "Exiting without updating."
+            return
+        fi
+        echo "Do you want to close all open Cursor instances before updating? (y/n)"
+        read -r fechar
+        if [[ "$fechar" =~ ^[yY]$ ]]; then
+            PIDS=$(pgrep -f /opt/cursor.appimage)
+            if [ -n "$PIDS" ]; then
+                echo "Found running Cursor process(es): $PIDS"
+                echo "Closing instances..."
+                pkill -9 -f /opt/cursor.appimage
+                sleep 2
+                # Check if any process remains
+                if pgrep -f /opt/cursor.appimage > /dev/null; then
+                    echo "Warning: Some Cursor instances could not be closed."
+                else
+                    echo "All Cursor instances have been closed."
+                fi
+            else
+                echo "No running Cursor instances found."
+            fi
+        fi
+        echo "Updating Cursor AI IDE..."
+        sudo rm -f $APPIMAGE_PATH
+    else
+        echo "Installing Cursor AI IDE..."
+    fi
+
     # Download Cursor AppImage
     echo "Downloading Cursor AppImage..."
     sudo curl -L $CURSOR_URL -o $APPIMAGE_PATH
@@ -29,7 +58,7 @@ echo "Installing Cursor AI IDE..."
     echo "Downloading Cursor icon..."
     sudo curl -L $ICON_URL -o $ICON_PATH
 
-    # Create a .desktop entry for Cursor
+    # Create .desktop entry for Cursor
     echo "Creating .desktop entry for Cursor..."
     sudo bash -c "cat > $DESKTOP_ENTRY_PATH" <<EOL
 [Desktop Entry]
@@ -40,21 +69,20 @@ Type=Application
 Categories=Development;
 EOL
 
-    echo "Adding cursor alias to .bashrc..."
-    bash -c "cat >> $HOME/.bashrc" <<EOL
+    # Add alias to .bashrc if not exists
+    if ! grep -q 'function cursor()' "$HOME/.bashrc"; then
+        echo "Adding cursor alias to .bashrc..."
+        bash -c "cat >> $HOME/.bashrc" <<EOL
 
 # Cursor alias
 function cursor() {
-    ( /opt/cursor.appimage --no-sandbox "$@" & ) > /dev/null 2>&1
+    ( /opt/cursor.appimage --no-sandbox \"\$@\" & ) > /dev/null 2>&1
 }
 EOL
+        source $HOME/.bashrc
+    fi
 
-    source $HOME/.bashrc
-
-    echo "Cursor AI IDE installation complete. You can find it in your application menu."
-else
-    echo "Cursor AI IDE is already installed."
-fi
+    echo "Cursor AI IDE installation/update complete. You can find it in your application menu."
 }
 
 installCursor
